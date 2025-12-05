@@ -1,0 +1,21 @@
+# JAR files
+*.jar
+*.war
+*.ear
+
+# Maven
+target/
+.m2/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Allure
+allure-results/
+allure-report/
+
+# Тестируемое приложение (в соседней папке)
+../app/
