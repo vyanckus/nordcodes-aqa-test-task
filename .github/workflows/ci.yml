@@ -28,7 +28,7 @@ jobs:
       - name: Download and extract tested application
         run: |
           wget -q -O app.7z "https://gametests.nyc.wf/aqa.7z"
-          7z x app.7z -o./app -p"g7%Kp9#rX2bl" -y
+          7z x app.7z -o./app -p"g7%Kp9#rX2bL" -y
           ls -la ./app/
 
       # 2. ЗАПУСКАЕМ ПРИЛОЖЕНИЕ В ФОНОВОМ РЕЖИМЕ
@@ -36,10 +36,19 @@ jobs:
         run: |
           cd ./app
           java -jar -Dsecret=qazWSXedc -Dmock=http://localhost:8888/ internal-0.0.1-SNAPSHOT.jar &
-          echo "Waiting for app to start..."
-          sleep 15
-          curl -f http://localhost:8080 || exit 1
+          echo "Waiting for app to start (max 45 seconds)..."
+          # Health check с повторами
+          for i in {1..15}; do
+          if curl -f http://localhost:8080/ > /dev/null 2>&1; then
           echo "Application is running on port 8080"
+          break
+          fi
+          sleep 3
+          if [ $i -eq 15 ]; then
+          echo "ERROR: Application failed to start"
+          exit 1
+          fi
+          done
 
       - name: Cache Maven dependencies
         uses: actions/cache@v3
