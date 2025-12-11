@@ -2,6 +2,10 @@
 
 ![Java CI with Allure Report](https://github.com/vyanckus/nordcodes-aqa-test-task/actions/workflows/ci.yml/badge.svg)
 
+(https://github.com/vyanckus/nordcodes-aqa-test-task/actions)
+
+[🌐 **Allure Report**](https://vyanckus.github.io/nordcodes-aqa-test-task/)
+
 Проект содержит автоматизированные end-to-end тесты для Spring Boot приложения, которое взаимодействует с внешним сервисом.
 Тесты написаны на Java с использованием JUnit 5, WireMock, RestAssured и Allure для отчётности.
 
