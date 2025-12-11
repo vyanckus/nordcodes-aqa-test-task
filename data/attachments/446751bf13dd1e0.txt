@@ -1,0 +1,9 @@
+POST http://localhost:8080/endpoint
+
+Headers:
+X-Api-Key: qazWSXedc
+Content-Type: application/x-www-form-urlencoded
+Accept: application/json
+
+Body:
+token=9J9DTQWW2KOEA3QLHR1QY6MT6FR0W8Z9&action=LOGIN
