@@ -1,5 +1,7 @@
 # Автоматизированные тесты для Spring Boot приложения (AQA Test Task)
 
+![Java CI with Allure Report](https://github.com/vyanckus/nordcodes-aqa-test-task/actions/workflows/ci.yml/badge.svg)
+
 Проект содержит автоматизированные end-to-end тесты для Spring Boot приложения, которое взаимодействует с внешним сервисом.
 Тесты написаны на Java с использованием JUnit 5, WireMock, RestAssured и Allure для отчётности.
 
@@ -16,6 +18,7 @@ src/test/java/com/nordcodes/aqa/
 │    └── ExternalServiceMock.java  
 ├── 📁 tests/ # Тестовые классы  
 │    └── AppEndpointE2ETest.java  
+│    └── AppEndpointHexE2ETest.java 
 └── 📁 utils/ # Вспомогательные утилиты  
      ├── TokenGenerator.java # Генератор токенов  
      └── AllureAttachments.java # Утилиты для Allure-аттачментов

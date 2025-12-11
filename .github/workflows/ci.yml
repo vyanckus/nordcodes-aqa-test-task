@@ -1,0 +1,65 @@
+name: Java CI with Allure Report
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # Установка 7zip перед распаковкой
+      - name: Install 7zip
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+      # 1. СКАЧИВАЕМ И РАСПАКОВЫВАЕМ ТЕСТИРУЕМОЕ ПРИЛОЖЕНИЕ (из ТЗ)
+      - name: Download and extract tested application
+        run: |
+          wget -q -O app.7z "https://gametests.nyc.wf/aqa.7z"
+          7z x app.7z -o./app -p"g7%Kp9#rX2bl" -y
+          ls -la ./app/
+
+      # 2. ЗАПУСКАЕМ ПРИЛОЖЕНИЕ В ФОНОВОМ РЕЖИМЕ
+      - name: Start Spring Boot application
+        run: |
+          cd ./app
+          java -jar -Dsecret=qazWSXedc -Dmock=http://localhost:8888/ internal-0.0.1-SNAPSHOT.jar &
+          echo "Waiting for app to start..."
+          sleep 15
+          curl -f http://localhost:8080 || exit 1
+          echo "Application is running on port 8080"
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # 3. ЗАПУСКАЕМ ТЕСТЫ (WireMock запустится сам через @BeforeAll)
+      - name: Run tests with Allure
+        run: mvn clean test allure:report -Daspectj.skip=true
+
+      # 4. ОСТАНАВЛИВАЕМ ПРИЛОЖЕНИЕ ПОСЛЕ ТЕСТОВ
+      - name: Stop Spring Boot application
+        run: |
+          pkill -f "internal-0.0.1-SNAPSHOT.jar" || true
+
+      - name: Upload Allure report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: target/site/allure-maven-plugin/
+          retention-days: 7
