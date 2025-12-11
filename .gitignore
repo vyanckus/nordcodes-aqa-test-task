@@ -1,21 +1,32 @@
-# JAR files
-*.jar
-*.war
-*.ear
-
-# Maven
+### Maven ###
 target/
-.m2/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
 
-# IDE
+### IDE ###
+# IntelliJ IDEA
 .idea/
 *.iml
-*.ipr
 *.iws
+*.ipr
+out/
 
-# Allure
+# VS Code
+.vscode/
+.settings/
+
+### System ###
+.DS_Store
+Thumbs.db
+
+### Logs ###
+*.log
+logs/
+
+### Allure ###
 allure-results/
 allure-report/
-
-# Тестируемое приложение (в соседней папке)
-../app/
+.allure/
