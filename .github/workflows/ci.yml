@@ -20,47 +20,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Установка 7zip перед распаковкой
-      - name: Install 7zip
-        run: sudo apt-get update && sudo apt-get install -y p7zip-full
-
-      # 1. СКАЧИВАЕМ И РАСПАКОВЫВАЕМ ТЕСТИРУЕМОЕ ПРИЛОЖЕНИЕ (из ТЗ)
-      - name: Download and extract tested application
-        run: |
-          wget -q -O app.7z "https://gametests.nyc.wf/aqa.7z"
-          7z x app.7z -o./app -p"g7%Kp9#rX2bL" -y
-          ls -la ./app/
-
-      # 2. ЗАПУСКАЕМ ПРИЛОЖЕНИЕ В ФОНОВОМ РЕЖИМЕ
-      - name: Start Spring Boot application
-        run: |
-          cd ./app
-          java -jar -Dsecret=qazWSXedc -Dmock=http://localhost:8888/ internal-0.0.1-SNAPSHOT.jar &
-          echo "Waiting for app to start (max 60 seconds)..."
-          for i in {1..20}; do
-            # Проверяем, что порт 8080 слушается (более надежная проверка)
-            if nc -z localhost 8080; then
-              # Дополнительная проверка: делаем корректный POST запрос как в ТЗ
-              if curl -X POST -f \
-                -H "X-Api-Key: qazWSXedc" \
-                -H "Content-Type: application/x-www-form-urlencoded" \
-                -H "Accept: application/json" \
-                -d "token=TESTTOKEN123456789012345678901234&action=LOGIN" \
-                http://localhost:8080/endpoint > /dev/null 2>&1; then
-                echo "Application is running and /endpoint is accessible via POST"
-                break
-              fi
-            fi
-            sleep 3
-            if [ $i -eq 20 ]; then
-              echo "ERROR: Application failed to start or /endpoint not accessible"
-              # Выводим информацию о процессе для диагностики
-              ps aux | grep java
-              netstat -tlnp | grep :8080 || true
-              exit 1
-            fi
-          done
-
       - name: Cache Maven dependencies
         uses: actions/cache@v3
         with:
@@ -68,17 +27,73 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-      # 3. ЗАПУСКАЕМ ТЕСТЫ (WireMock запустится сам через @BeforeAll)
-      - name: Run tests with Allure
-        run: mvn clean test allure:report -Daspectj.skip=true
-        env:
-          # Убедимся, что WireMock использует порт 8888
-          WIREMOCK_PORT: 8888
+      # Установка необходимых утилит
+      - name: Install required tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full netcat-openbsd
 
-      # 4. ОСТАНАВЛИВАЕМ ПРИЛОЖЕНИЕ ПОСЛЕ ТЕСТОВ
-      - name: Stop Spring Boot application
+      # 1. СКАЧИВАЕМ И РАСПАКОВЫВАЕМ ТЕСТИРУЕМОЕ ПРИЛОЖЕНИЕ
+      - name: Download and extract tested application
+        run: |
+          wget -q -O app.7z "https://gametests.nyc.wf/aqa.7z"
+          7z x app.7z -o./app -p"g7%Kp9#rX2bL" -y
+          echo "Extracted application files:"
+          ls -la ./app/
+
+      # 2. ЗАПУСКАЕМ ПРИЛОЖЕНИЕ С ПРОСТОЙ ПРОВЕРКОЙ
+      - name: Start Spring Boot application
+        run: |
+          echo "Starting Spring Boot application..."
+          cd ./app
+          # Запускаем приложение в фоне с логированием
+          java -jar -Dsecret=qazWSXedc -Dmock=http://localhost:8888/ internal-0.0.1-SNAPSHOT.jar > spring-app.log 2>&1 &
+          SPRING_PID=$!
+          echo "Spring Boot PID: $SPRING_PID"
+          
+          # Даем время на запуск - 20 секунд должно хватить
+          echo "Waiting for application to start (20 seconds)..."
+          sleep 20
+          
+          # Простая проверка - порт должен быть занят
+          echo "Checking if port 8080 is in use..."
+          if ss -tuln | grep :8080 > /dev/null; then
+            echo "✓ Port 8080 is listening"
+            echo "Application startup logs (last 20 lines):"
+            tail -20 spring-app.log
+          else
+            echo "✗ Port 8080 is NOT listening"
+            echo "Full application log:"
+            cat spring-app.log
+            exit 1
+          fi
+
+      # 3. ЗАПУСКАЕМ ТЕСТЫ (WireMock запустится в @BeforeAll тестов)
+      - name: Run tests with Allure
+        run: |
+          echo "=== Running tests ==="
+          # WireMock запустится автоматически в тестах перед всеми тестами
+          mvn clean test allure:report -Daspectj.skip=true
+        env:
+          # Настраиваем переменные окружения для тестов
+          SPRING_APP_URL: "http://localhost:8080"
+          WIREMOCK_PORT: "8888"
+
+      # 4. ОСТАНАВЛИВАЕМ ПРИЛОЖЕНИЕ И СОБИРАЕМ ЛОГИ
+      - name: Stop application and collect logs
         if: always()
         run: |
+          echo "=== Collecting diagnostic information ==="
+          echo "Active Java processes:"
+          ps aux | grep java || true
+          
+          echo "Open ports:"
+          ss -tuln | grep -E ':(8080|8888)' || true
+          
+          echo "Spring application log (last 50 lines):"
+          tail -50 ./app/spring-app.log 2>/dev/null || echo "No spring-app.log found"
+          
+          echo "Stopping Spring Boot application..."
           pkill -f "internal-0.0.1-SNAPSHOT.jar" || true
           sleep 2
 
@@ -88,4 +103,13 @@ jobs:
         with:
           name: allure-report
           path: target/site/allure-maven-plugin/
+          retention-days: 7
+
+      # 5. СОХРАНЯЕМ ЛОГИ ПРИЛОЖЕНИЯ ДЛЯ ДИАГНОСТИКИ
+      - name: Upload application logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spring-boot-logs
+          path: ./app/spring-app.log
           retention-days: 7
